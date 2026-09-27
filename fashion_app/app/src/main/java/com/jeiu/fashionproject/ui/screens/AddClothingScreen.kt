@@ -42,7 +42,7 @@ import com.jeiu.fashionproject.ui.viewmodel.ImageMode
  * 등록: 사진 선택 → 누끼(배경 제거) → 서버 DeepFashion2로 옷 종류 분류 → 고른 옷만 오려내기 + 색상 추출 →
  *       사용자가 사진 종류·분류·세부 종류·계절을 확인/수정 후 옷장에 추가. 서버 미연결 시 종류를 직접 고른다.
  * 수정([editItemId]가 있을 때): 저장된 옷을 같은 화면에 불러와 고친다.
- *       사진 버전(옷만·배경 제거·원본)이 부족하면 [사진 다시 분석하기]로 다시 만든다.
+ *       사진 종류는 저장해 둔 버전(옷만·배경 제거·원본) 중에서만 고를 수 있다.
  */
 @Composable
 fun AddClothingScreen(
@@ -191,19 +191,6 @@ fun AddClothingScreen(
                             "배경 제거를 사용할 수 없어 원본 사진으로 등록해요.",
                             style = MaterialTheme.typography.bodySmall, color = MediumGray
                         )
-                    }
-
-                    // 수정 화면: 사진 종류가 부족하면 다시 분석
-                    if (isEdit && modes.size < 3 && !s.garmentLoading) {
-                        OutlinedButton(
-                            onClick = { viewModel.reanalyze(context) },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = Camel, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("사진 다시 분석하기 (옷만 · 배경 제거 사진 만들기)", color = Brown, style = MaterialTheme.typography.labelLarge)
-                        }
                     }
 
                     // AI 분류 결과 배지

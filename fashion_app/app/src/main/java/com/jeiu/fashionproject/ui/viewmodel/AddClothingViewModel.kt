@@ -28,7 +28,7 @@ import java.io.File
  *       3) 옷만 오려내기 — 고른 후보의 윤곽 마스크로 사람 몸·다른 옷을 지움
  *       4) 옷 픽셀(투명하지 않은 부분)만으로 대표 색상 추출
  *       사진 세 가지(원본·배경 제거·옷만)를 모두 보관해 나중에 수정에서 바꿀 수 있게 한다.
- * 수정: 저장된 옷을 불러와 같은 화면에서 고친다. 사진 버전이 부족하면 [다시 분석]으로 다시 만든다.
+ * 수정: 저장된 옷을 불러와 같은 화면에서 고친다. 사진 종류는 저장해 둔 버전 중에서만 고른다.
  * 서버에 연결할 수 없으면 사용자가 종류를 직접 고르고, 누끼에 실패하면 원본 사진으로 계속 진행한다.
  */
 enum class ImageMode { GARMENT, CUTOUT, ORIGINAL }
@@ -48,7 +48,7 @@ sealed class AddClothingUiState {
         val colors: Map<ImageMode, ColorTag>,      // 사진 종류별 대표 색
         val defaultMode: ImageMode,                // 처음 보여줄 사진 종류
         val garmentLoading: Boolean = false,
-        val analyzed: Boolean = true               // 수정 화면에서 아직 [다시 분석]을 안 했으면 false
+        val analyzed: Boolean = true               // 수정 화면처럼 분석 없이 저장된 정보를 불러왔으면 false
     ) : AddClothingUiState() {
         val selectedCandidate: ClothingCandidate? get() = candidates.getOrNull(selected)
         fun uriFor(mode: ImageMode): String? = when (mode) {
@@ -79,7 +79,7 @@ class AddClothingViewModel : ViewModel() {
         viewModelScope.launch { analyze(context, uri) }
     }
 
-    /** 누끼 → 분류 → 색 → 첫 후보 오려내기. 등록과 [다시 분석]이 함께 쓴다. */
+    /** 누끼 → 분류 → 색 → 첫 후보 오려내기 */
     private suspend fun analyze(context: Context, uri: Uri) {
         // ① 누끼
         val cut = runCatching { BackgroundRemover.process(context, uri) }.getOrElse {
@@ -214,17 +214,6 @@ class AddClothingViewModel : ViewModel() {
             if (cur.analyzed) return@launch
             _state.value = cur.copy(colors = cur.colors + extra)
         }
-    }
-
-    /** [사진 다시 분석] — 원본(없으면 지금 사진)으로 누끼·분류·오려내기를 다시 한다. 입력한 정보는 그대로 둔다. */
-    fun reanalyze(context: Context) {
-        val s = _state.value as? AddClothingUiState.Tagged ?: return
-        val source = s.originalUri ?: s.cutoutUri ?: s.garmentUri ?: return
-        garmentJob?.cancel()
-        // 이번 수정 중에 만든 임시 파일은 지운다 (저장된 옷의 파일은 수정 완료 때 정리)
-        listOfNotNull(s.originalUri, s.cutoutUri, s.garmentUri).forEach { deleteIfTemp(context, it) }
-        _state.value = AddClothingUiState.Tagging
-        viewModelScope.launch { analyze(context, Uri.parse(source)) }
     }
 
     /** 수정 완료 — 같은 번호로 덮어써서 착용 기록·하트·등록일·보관 기록이 그대로 이어진다. */
