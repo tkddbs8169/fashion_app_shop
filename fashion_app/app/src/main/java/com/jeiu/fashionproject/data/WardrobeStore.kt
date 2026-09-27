@@ -87,17 +87,15 @@ object WardrobeStore {
                 latest.copy(addedAt = item.addedAt, favoritedAt = item.favoritedAt, keptAt = item.keptAt)
             }
         }
-        // 샘플 사진이 그대로면, 비어 있는 사진 버전 칸(원본·배경 제거·옷만)을 최신 샘플 정보로 채워 준다.
+        // 사진 버전 칸이 생기기 전에 들어간 샘플은, 사진이 그대로면 원본·옷만 버전을 채워 준다.
         items = items.map { item ->
             val latest = latestSamples[item.id]
-            if (latest == null || item.imageUri != latest.imageUri) return@map item
-            val filled = item.copy(
-                originalUri = item.originalUri ?: latest.originalUri,
-                cutoutUri = item.cutoutUri ?: latest.cutoutUri,
-                garmentUri = item.garmentUri ?: latest.garmentUri
-            )
-            if (filled != item) needsSave = true
-            filled
+            val noVersions = item.originalUri == null && item.cutoutUri == null && item.garmentUri == null
+            if (latest == null || !noVersions || item.imageUri != latest.imageUri) item
+            else {
+                needsSave = true
+                item.copy(originalUri = latest.originalUri, cutoutUri = latest.cutoutUri, garmentUri = latest.garmentUri)
+            }
         }
 
         _items.value = items

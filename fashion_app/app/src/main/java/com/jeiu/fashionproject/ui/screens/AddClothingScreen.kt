@@ -69,11 +69,6 @@ fun AddClothingScreen(
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { viewModel.tagImage(context, it) }
     }
-    // 수정 화면: 원본이 없는 옷에 원래 사진을 다시 연결하고 그 사진으로 다시 분석
-    val originalPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.reanalyze(context, newOriginal = it) }
-    }
-
     // 수정 모드: 저장된 옷을 불러와 입력칸을 채운다
     LaunchedEffect(editItemId) {
         viewModel.attach(context)
@@ -198,26 +193,8 @@ fun AddClothingScreen(
                         )
                     }
 
-                    // 수정 화면: 원본이 없는 옷은 원래 사진을 다시 골라 원본을 되살린다
-                    if (isEdit && s.originalUri == null && !s.garmentLoading) {
-                        Button(
-                            onClick = { originalPicker.launch("image/*") },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CamelLight, contentColor = Brown),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("원본 사진 다시 고르기", style = MaterialTheme.typography.labelLarge)
-                        }
-                        Text(
-                            "이 옷은 원본 사진이 남아 있지 않아요. 처음 등록할 때 쓴 사진을 고르면 원본을 보관하고 다시 분석해요.",
-                            style = MaterialTheme.typography.bodySmall, color = MediumGray
-                        )
-                    }
-
                     // 수정 화면: 사진 종류가 부족하면 다시 분석
-                    if (isEdit && s.originalUri != null && modes.size < 3 && !s.garmentLoading) {
+                    if (isEdit && modes.size < 3 && !s.garmentLoading) {
                         OutlinedButton(
                             onClick = { viewModel.reanalyze(context) },
                             shape = RoundedCornerShape(12.dp),

@@ -72,9 +72,6 @@ class AddClothingViewModel : ViewModel() {
 
     private var garmentJob: Job? = null
 
-    /** 수정 중인 옷이 보여주던 사진 종류 — 다시 분석해도 같은 종류(옷만/배경 제거/원본)를 유지한다 */
-    private var preferredMode: ImageMode? = null
-
     // ── 등록 ────────────────────────────────────────────────────────────
 
     fun tagImage(context: Context, uri: Uri) {
@@ -102,7 +99,6 @@ class AddClothingViewModel : ViewModel() {
         colors[ImageMode.ORIGINAL] = colorOf(null, cut.originalPath)
         cut.cutoutBitmap?.let { colors[ImageMode.CUTOUT] = colorOf(it, cut.originalPath); it.recycle() }
 
-        val baseMode = if (cut.cutoutPath != null) ImageMode.CUTOUT else ImageMode.ORIGINAL
         val tagged = AddClothingUiState.Tagged(
             candidates = candidates.orEmpty(),
             selected = 0,
@@ -111,20 +107,11 @@ class AddClothingViewModel : ViewModel() {
             cutoutUri = cut.cutoutPath?.let(::fileUri),
             garmentUri = null,
             colors = colors,
-            defaultMode = if (preferredMode == ImageMode.ORIGINAL) ImageMode.ORIGINAL else baseMode
+            defaultMode = if (cut.cutoutPath != null) ImageMode.CUTOUT else ImageMode.ORIGINAL
         )
         _state.value = tagged
-        // ④ 후보 하나만 오려내기 — 등록은 가장 크게 잡힌 옷, 수정은 저장된 옷과 같은 종류의 옷
-        if (tagged.candidates.isNotEmpty()) selectCandidate(context, matchingCandidate(tagged.candidates))
-    }
-
-    /** 수정 중이면 저장된 옷의 소분류 → 대분류와 같은 후보를 고른다. 없거나 등록 중이면 0번(가장 큰 옷). */
-    private fun matchingCandidate(candidates: List<ClothingCandidate>): Int {
-        val item = editingItem ?: return 0
-        val mappings = candidates.map { mappingOf(it) }
-        return mappings.indexOfFirst { it != null && it.subCategory == item.subCategory }.takeIf { it >= 0 }
-            ?: mappings.indexOfFirst { it?.category == item.category }.takeIf { it >= 0 }
-            ?: 0
+        // ④ 첫 번째 후보만 오려내기
+        if (tagged.candidates.isNotEmpty()) selectCandidate(context, 0)
     }
 
     /** 후보를 바꾸면 그 옷의 윤곽으로 다시 오려낸다. */
@@ -154,8 +141,7 @@ class AddClothingViewModel : ViewModel() {
             val color = colorOf(garment.bitmap, basePath)
             garment.bitmap.recycle()
             // 오려낸 옷이 원래 누끼의 85% 미만이면 사람 몸·다른 옷이 섞여 있었던 것 → "옷만"을 기본으로
-            // (수정 중이면 저장된 옷이 쓰던 사진 종류를 그대로 유지)
-            val mode = preferredMode ?: if (garment.coverage < 0.85f) ImageMode.GARMENT else baseMode
+            val mode = if (garment.coverage < 0.85f) ImageMode.GARMENT else baseMode
             _state.value = cur.copy(
                 garmentUri = fileUri(garment.path),
                 colors = cur.colors + (ImageMode.GARMENT to color),
@@ -203,14 +189,9 @@ class AddClothingViewModel : ViewModel() {
         // 보여주던 사진이 버전 칸에 없으면(버전 칸이 생기기 전에 등록한 옷) 누끼 여부에 따라 알맞은 자리에 넣는다
         var original = item.originalUri
         var cutout = item.cutoutUri
-        var garment = item.garmentUri
+        val garment = item.garmentUri
         if (item.imageUri !in setOfNotNull(original, cutout, garment)) {
-            when {
-                // BackgroundRemover가 옷만 오려낸 파일은 이름이 _garment.png로 끝난다
-                item.imageUri.endsWith("_garment.png") -> garment = garment ?: item.imageUri
-                item.isCutout -> cutout = cutout ?: item.imageUri
-                else -> original = original ?: item.imageUri
-            }
+            if (item.isCutout) cutout = cutout ?: item.imageUri else original = original ?: item.imageUri
         }
         val currentMode = when (item.imageUri) {
             garment -> ImageMode.GARMENT
@@ -223,7 +204,6 @@ class AddClothingViewModel : ViewModel() {
             colors = mapOf(currentMode to ColorTag(item.colorName, item.colorValue)),
             defaultMode = currentMode, analyzed = false
         )
-        preferredMode = currentMode
         _state.value = tagged
         // 나머지 버전의 대표 색은 사진에서 계산해 둔다
         viewModelScope.launch {
@@ -236,13 +216,10 @@ class AddClothingViewModel : ViewModel() {
         }
     }
 
-    /**
-     * [사진 다시 분석] — 원본(없으면 지금 사진)으로 누끼·분류·오려내기를 다시 한다. 입력한 정보는 그대로 둔다.
-     * [newOriginal]을 주면([원본 사진 다시 고르기]) 그 사진을 원본으로 삼아 분석한다.
-     */
-    fun reanalyze(context: Context, newOriginal: Uri? = null) {
+    /** [사진 다시 분석] — 원본(없으면 지금 사진)으로 누끼·분류·오려내기를 다시 한다. 입력한 정보는 그대로 둔다. */
+    fun reanalyze(context: Context) {
         val s = _state.value as? AddClothingUiState.Tagged ?: return
-        val source = newOriginal?.toString() ?: s.originalUri ?: s.cutoutUri ?: s.garmentUri ?: return
+        val source = s.originalUri ?: s.cutoutUri ?: s.garmentUri ?: return
         garmentJob?.cancel()
         // 이번 수정 중에 만든 임시 파일은 지운다 (저장된 옷의 파일은 수정 완료 때 정리)
         listOfNotNull(s.originalUri, s.cutoutUri, s.garmentUri).forEach { deleteIfTemp(context, it) }
@@ -278,7 +255,6 @@ class AddClothingViewModel : ViewModel() {
             )
         )
         editingItem = null
-        preferredMode = null
         _state.value = AddClothingUiState.Idle
     }
 
