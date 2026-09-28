@@ -17,8 +17,7 @@ import java.util.Locale
 data class WearLog(
     val date: String,              // "2026-09-26"
     val itemIds: List<String>,
-    val memo: String = "",
-    val demo: Boolean = false      // 시연용 샘플 기록 (시연 기록 지우기로 이것만 지움)
+    val memo: String = ""
 )
 
 /** 착용 기록 저장소 — WardrobeStore와 같은 방식(StateFlow + SharedPreferences JSON). */
@@ -35,8 +34,8 @@ object WearLogStore {
     fun load(context: Context) {
         if (loaded) return
         loaded = true
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null) ?: return
-        runCatching {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
+        if (raw != null) runCatching {
             val arr = JSONArray(raw)
             _logs.value = (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
@@ -44,11 +43,12 @@ object WearLogStore {
                 WearLog(
                     date = o.getString("date"),
                     itemIds = List(ids.length()) { ids.getString(it) },
-                    memo = o.optString("memo", ""),
-                    demo = o.optBoolean("demo", false)
+                    memo = o.optString("memo", "")
                 )
             }.sortedBy { it.date }
         }
+        // 처음 켤 때 한 번만 샘플 옷의 지난 착용 기록을 넣는다
+        SampleWearHistory.applyOnce(context)
     }
 
     fun logFor(date: String): WearLog? = _logs.value.find { it.date == date }
@@ -74,11 +74,6 @@ object WearLogStore {
         return toAdd.size
     }
 
-    fun removeDemo(context: Context) {
-        _logs.value = _logs.value.filterNot { it.demo }
-        persist(context)
-    }
-
     private fun persist(context: Context) {
         val arr = JSONArray()
         _logs.value.forEach { log ->
@@ -87,7 +82,6 @@ object WearLogStore {
                     .put("date", log.date)
                     .put("itemIds", JSONArray(log.itemIds))
                     .put("memo", log.memo)
-                    .put("demo", log.demo)
             )
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

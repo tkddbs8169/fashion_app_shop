@@ -101,6 +101,8 @@ object WardrobeStore {
         _items.value = items
         if (needsSave) persist(context)
         cleanUpOrphanPhotos(context)
+        // 처음 켤 때 한 번만 샘플 옷을 약 6개월 전 등록으로 옮기고 지난 착용 기록을 넣는다
+        SampleWearHistory.applyOnce(context)
     }
 
     /**

@@ -25,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.jeiu.fashionproject.data.DemoWearData
 import com.jeiu.fashionproject.data.WardrobeStore
 import com.jeiu.fashionproject.data.WearDates
 import com.jeiu.fashionproject.data.WearLogStore
@@ -224,38 +223,6 @@ fun WearCalendarScreen(
                         Text("${stat.count}회", style = MaterialTheme.typography.titleSmall, color = Brown, fontWeight = FontWeight.SemiBold)
                     }
                 }
-            }
-        }
-
-        // ── 시연용 샘플 데이터 (개발용 앱에서만 보임) ─────────────────
-        if (DemoWearData.isAvailable(context)) {
-            var demoApplied by remember { mutableStateOf(DemoWearData.isApplied(context)) }
-            var demoMessage by remember { mutableStateOf<String?>(null) }
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("시연용 (개발용 앱에서만 보여요)", style = MaterialTheme.typography.labelMedium, color = MediumGray)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            val added = DemoWearData.apply(context)
-                            demoApplied = true
-                            demoMessage = "시연 기록 ${added}건을 넣었어요. 옷장에서 알림 카드를 확인하세요."
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("시연용 기록 넣기", color = Brown) }
-                    OutlinedButton(
-                        onClick = {
-                            DemoWearData.clear(context)
-                            demoApplied = false
-                            demoMessage = "시연 기록을 지우고 샘플 옷 등록일을 되돌렸어요."
-                        },
-                        enabled = demoApplied,
-                        shape = RoundedCornerShape(12.dp)
-                    ) { Text("시연용 기록 지우기", color = if (demoApplied) Brown else MediumGray) }
-                }
-                demoMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Camel) }
             }
         }
     }
