@@ -24,6 +24,8 @@ backend/uploads/
 
 # YOLO 기본 모델 — 없으면 서버가 처음 실행될 때 자동으로 다시 받는다
 backend/yolov8n.pt
+# DeepFashion2 모델 (서버가 처음 쓸 때 자동 다운로드)
+backend/models/
 
 # 개발하며 찍은 스크린샷·참고 사진 모음 (코드 아님, 용량 큼)
 fashion_app/_assets/

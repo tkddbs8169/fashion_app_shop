@@ -11,7 +11,7 @@
 후보는 크게 잡힌 순서로 정렬해 반환한다. (앱은 첫 번째 후보를 기본 선택)
 마스크는 앱이 "옷만 오려내기"에 쓰도록 흑백 PNG(base64)로 보낸다.
 
-모델 파일: models/deepfashion2_yolov8s-seg.pt  (받는 방법은 README.md 참고)
+모델 파일: models/deepfashion2_yolov8s-seg.pt  (없으면 처음 쓸 때 허깅페이스에서 자동 다운로드, README.md 참고)
 """
 import base64
 from functools import lru_cache
@@ -25,7 +25,27 @@ from PIL import Image
 import detection
 
 DF2_MODEL_PATH = Path(__file__).parent / "models" / "deepfashion2_yolov8s-seg.pt"
+# 공개 가중치 (Bingsu/adetailer, 저장소 라이선스 Apache-2.0 / 학습 데이터 DeepFashion2는 비상업 연구용)
+DF2_MODEL_URL = "https://huggingface.co/Bingsu/adetailer/resolve/main/deepfashion2_yolov8s-seg.pt"
 BAG_LABELS = {"handbag", "backpack", "suitcase"}
+
+
+def _download_df2_model() -> None:
+    """모델 파일이 없으면 허깅페이스에서 내려받는다 (약 24MB, 처음 한 번만).
+
+    임시 파일로 받은 뒤 이름을 바꿔, 받다가 끊겨도 깨진 파일이 남지 않게 한다.
+    """
+    import urllib.request
+
+    DF2_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = DF2_MODEL_PATH.with_suffix(".part")
+    print(f"[fashion_detection] DeepFashion2 모델 내려받는 중… ({DF2_MODEL_URL})")
+    try:
+        urllib.request.urlretrieve(DF2_MODEL_URL, tmp)
+        tmp.replace(DF2_MODEL_PATH)
+    finally:
+        tmp.unlink(missing_ok=True)
+    print(f"[fashion_detection] 모델 저장 완료: {DF2_MODEL_PATH}")
 
 
 @lru_cache(maxsize=1)
@@ -33,9 +53,12 @@ def load_df2_model():
     from ultralytics import YOLO  # 무거운 import는 최초 호출 시점으로 지연
 
     if not DF2_MODEL_PATH.exists():
-        raise FileNotFoundError(
-            f"DeepFashion2 모델 파일이 없습니다: {DF2_MODEL_PATH} (backend/README.md 참고)"
-        )
+        try:
+            _download_df2_model()
+        except Exception as e:
+            raise FileNotFoundError(
+                f"DeepFashion2 모델 파일이 없고 자동 다운로드에도 실패했습니다: {e} (backend/README.md 참고)"
+            ) from e
     return YOLO(str(DF2_MODEL_PATH))
 
 

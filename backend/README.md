@@ -112,7 +112,7 @@ backend/
 ├── main.py          # FastAPI 앱 + 엔드포인트 (화면별로 주석 구분)
 ├── detection.py     # YOLOv8 객체 탐지 모듈 (object_detect 프로젝트 통합)
 ├── fashion_detection.py  # DeepFashion2 옷 종류 분류 + COCO 가방류 합치기
-├── models/          # deepfashion2_yolov8s-seg.pt (직접 받기, 아래 참고)
+├── models/          # deepfashion2_yolov8s-seg.pt (처음 요청 때 자동 다운로드, git에는 넣지 않음)
 ├── schemas.py       # 응답/요청 JSON 스키마 (앱 data class와 1:1)
 ├── data.py          # 인메모리 모의 DB (앱 더미 데이터를 그대로 이전)
 └── requirements.txt
@@ -168,9 +168,13 @@ AI 옷 등록 화면(AddClothingScreen)이 사용합니다. `POST /api/clothing/
 }
 ```
 
-### 모델 파일 받기 (처음 한 번)
+### 모델 파일 (자동 다운로드)
 
-모델 파일은 용량(약 24MB) 때문에 저장소에 넣지 않았습니다. `backend/models/` 폴더에 받아 주세요.
+모델 파일(약 24MB)은 용량과 라이선스 때문에 저장소에 넣지 않습니다(`.gitignore`의 `backend/models/`).
+서버에서 옷 분류를 **처음 요청할 때** `backend/models/`에 파일이 없으면 허깅페이스에서 자동으로 내려받습니다.
+(첫 요청은 다운로드 때문에 조금 느리고, 인터넷이 필요합니다. 발표 전에 한 번 미리 실행해 두세요.)
+
+자동 다운로드가 안 되는 환경이면 직접 받아 주세요.
 
 ```bash
 mkdir models
@@ -179,7 +183,7 @@ curl -L -o models/deepfashion2_yolov8s-seg.pt https://huggingface.co/Bingsu/adet
 
 - 출처: [Bingsu/adetailer](https://huggingface.co/Bingsu/adetailer) (저장소 라이선스 Apache-2.0, mAP50 0.849)
 - 학습 데이터 [DeepFashion2](https://github.com/switchablenorms/DeepFashion2)는 **비상업 연구용** → 캡스톤 시연 용도로만 사용
-- 파일이 없으면 이 API는 503 오류를 돌려주고, 앱은 사용자가 종류를 직접 고르는 방식으로 동작합니다.
+- 파일이 없고 자동 다운로드에도 실패하면 이 API는 503 오류를 돌려주고, 앱은 사용자가 종류를 직접 고르는 방식으로 동작합니다.
 
 ### ultralytics 설치 시 주의 (Windows)
 
