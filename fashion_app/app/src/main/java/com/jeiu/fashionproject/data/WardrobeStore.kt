@@ -34,7 +34,8 @@ data class WardrobeItem(
     // 옷 정보 수정에서 사진 종류를 바꿀 수 있도록 세 가지 버전을 모두 보관한다 (없으면 null)
     val originalUri: String? = null,    // 원본
     val cutoutUri: String? = null,      // 배경 제거 (ML Kit 누끼)
-    val garmentUri: String? = null      // 옷만 (DeepFashion2 윤곽으로 오려냄)
+    val garmentUri: String? = null,     // 옷만 (DeepFashion2 윤곽으로 오려냄)
+    val style: String? = null           // 사용자가 고른 스타일 (null이면 StyleTagger가 자동으로 붙인 스타일 사용)
 ) {
     /** 이 옷이 쓰는 사진 주소 전부 (보여주는 사진 + 보관한 버전들) */
     fun photoUris(): Set<String> = setOfNotNull(imageUri, originalUri, cutoutUri, garmentUri)
@@ -95,6 +96,16 @@ object WardrobeStore {
             else {
                 needsSave = true
                 item.copy(originalUri = latest.originalUri, cutoutUri = latest.cutoutUri, garmentUri = latest.garmentUri)
+            }
+        }
+
+        // 신발 세부 종류가 생기기 전에 들어간 샘플 신발은 세부 종류(스니커즈·로퍼)를 채워 준다.
+        items = items.map { item ->
+            val latest = latestSamples[item.id]
+            if (latest == null || item.detailType != null || latest.detailType == null || item.subCategory != latest.subCategory) item
+            else {
+                needsSave = true
+                item.copy(detailType = latest.detailType)
             }
         }
 
@@ -177,7 +188,8 @@ object WardrobeStore {
         keptAt = if (o.has("keptAt")) o.getLong("keptAt") else null,
         originalUri = o.optStringOrNull("originalUri"),
         cutoutUri = o.optStringOrNull("cutoutUri"),
-        garmentUri = o.optStringOrNull("garmentUri")
+        garmentUri = o.optStringOrNull("garmentUri"),
+        style = o.optStringOrNull("style")
     )
 
     private fun JSONObject.optStringOrNull(key: String): String? =
@@ -205,6 +217,7 @@ object WardrobeStore {
                     .put("originalUri", item.originalUri)
                     .put("cutoutUri", item.cutoutUri)
                     .put("garmentUri", item.garmentUri)
+                    .put("style", item.style)
             )
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

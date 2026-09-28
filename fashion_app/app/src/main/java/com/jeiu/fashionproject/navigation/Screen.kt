@@ -4,7 +4,8 @@ sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Home : Screen("home")
     object Wardrobe : Screen("wardrobe")
-    object WeatherOutfit : Screen("weather_outfit")
+    /** 코디 추천 (오늘 / 상황별) — 계획 4 */
+    object OutfitRecommend : Screen("outfit_recommend")
     object BodyAnalysis : Screen("body_analysis")
     object Shop : Screen("shop")
     object ProductDetail : Screen("product_detail")

@@ -12,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,10 +38,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
-import com.jeiu.fashionproject.data.WeatherOutfits
+import com.jeiu.fashionproject.data.StylePreferenceStore
+import com.jeiu.fashionproject.data.WardrobeStore
+import com.jeiu.fashionproject.data.WearLogStore
 import com.jeiu.fashionproject.data.advice
 import com.jeiu.fashionproject.data.isRainy
 import com.jeiu.fashionproject.data.isCloudy
+import com.jeiu.fashionproject.recommend.OutfitEngine
+import com.jeiu.fashionproject.ui.components.NotEnoughClothesCard
+import com.jeiu.fashionproject.ui.components.OutfitCard
 import com.jeiu.fashionproject.ui.theme.*
 import com.jeiu.fashionproject.ui.viewmodel.WeatherUiState
 import com.jeiu.fashionproject.ui.viewmodel.WeatherViewModel
@@ -59,7 +63,12 @@ private val popularItems = listOf(
 )
 
 @Composable
-fun HomeScreen(onWeatherOutfitClick: () -> Unit, onProductClick: () -> Unit, weatherViewModel: WeatherViewModel) {
+fun HomeScreen(
+    onOutfitRecommendClick: () -> Unit,
+    onProductClick: () -> Unit,
+    onAddClothing: () -> Unit,
+    weatherViewModel: WeatherViewModel
+) {
     val weatherState by weatherViewModel.state.collectAsState()
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -67,6 +76,9 @@ fun HomeScreen(onWeatherOutfitClick: () -> Unit, onProductClick: () -> Unit, wea
     ) { weatherViewModel.fetchWeather() }
 
     LaunchedEffect(Unit) {
+        StylePreferenceStore.load(context)
+        WardrobeStore.load(context)
+        WearLogStore.load(context)
         val coarseGranted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
@@ -82,9 +94,15 @@ fun HomeScreen(onWeatherOutfitClick: () -> Unit, onProductClick: () -> Unit, wea
         }
     }
 
-    val outfitCards = WeatherOutfits.cardsFor(
-        (weatherState as? WeatherUiState.Success)?.info
-    )
+    // 오늘의 AI 코디 — 옷장 옷으로 코디 엔진이 만든다 (계획 4)
+    val wardrobe by WardrobeStore.items.collectAsState()
+    val wearLogs by WearLogStore.logs.collectAsState()
+    val weatherInfo = (weatherState as? WeatherUiState.Success)?.info
+    // 👍👎를 눌러도 카드가 바로 바뀌지 않도록 취향 점수는 계산할 때의 값만 쓴다
+    val recommendation = remember(wardrobe, wearLogs, weatherInfo) {
+        OutfitEngine.recommend(wardrobe, weatherInfo, wearLogs, StylePreferenceStore.scores.value)
+    }
+    var ratings by remember { mutableStateOf(mapOf<String, Boolean>()) }
     var showNotifDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -134,7 +152,7 @@ fun HomeScreen(onWeatherOutfitClick: () -> Unit, onProductClick: () -> Unit, wea
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .clickable(onClick = onWeatherOutfitClick),
+                .clickable(onClick = onOutfitRecommendClick),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Camel),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -196,49 +214,40 @@ fun HomeScreen(onWeatherOutfitClick: () -> Unit, onProductClick: () -> Unit, wea
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("오늘의 AI 코디", style = MaterialTheme.typography.titleLarge, color = CharcoalBlack, fontWeight = FontWeight.Bold)
-            TextButton(onClick = onWeatherOutfitClick) {
+            TextButton(onClick = onOutfitRecommendClick) {
                 Text("전체보기", style = MaterialTheme.typography.bodySmall, color = Camel)
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            itemsIndexed(outfitCards) { index, card ->
-                Card(
-                    modifier = Modifier
-                        .width(160.dp)
-                        .clickable {
-                            when {
-                                card.purchaseUrl.isNotEmpty() -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(card.purchaseUrl)))
-                                index == 0 -> onProductClick()
-                                else -> onWeatherOutfitClick()
-                            }
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = card.bgColor),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        when (val r = recommendation) {
+            is OutfitEngine.Result.NotEnough -> NotEnoughClothesCard(
+                message = r.message,
+                onAddClothing = onAddClothing,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            is OutfitEngine.Result.Ok -> {
+                r.notice?.let {
+                    Text(
+                        it, style = MaterialTheme.typography.bodySmall, color = Brown,
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                    )
+                }
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp)
-                        ) {
-                            AsyncImage(
-                                model = card.imageSource,
-                                contentDescription = card.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(card.title, style = MaterialTheme.typography.titleMedium, color = CharcoalBlack, fontWeight = FontWeight.SemiBold)
-                            Text(card.desc, style = MaterialTheme.typography.bodySmall, color = MediumGray)
-                        }
+                    items(r.outfits, key = { it.id }) { outfit ->
+                        OutfitCard(
+                            outfit = outfit,
+                            rated = ratings[outfit.id],
+                            modifier = Modifier.width(260.dp),
+                            onRate = { like ->
+                                ratings = ratings + (outfit.id to like)
+                                StylePreferenceStore.rate(context, outfit.style, like)
+                            }
+                        )
                     }
                 }
             }

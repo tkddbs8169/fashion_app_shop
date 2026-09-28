@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.jeiu.fashionproject.data.ClothingCategories
+import com.jeiu.fashionproject.data.StylePreferenceStore
 import com.jeiu.fashionproject.data.WardrobeStore
+import com.jeiu.fashionproject.recommend.StyleTagger
 import com.jeiu.fashionproject.ui.theme.*
 import com.jeiu.fashionproject.ui.viewmodel.AddClothingUiState
 import com.jeiu.fashionproject.ui.viewmodel.AddClothingViewModel
@@ -63,6 +65,7 @@ fun AddClothingScreen(
     // 사용자가 직접 고친 값 (null이면 자동 값 사용)
     var nameOverride by remember { mutableStateOf<String?>(null) }
     var seasonOverride by remember { mutableStateOf<String?>(null) }
+    var styleOverride by remember { mutableStateOf<String?>(null) }
     // 수정 화면에서는 AI 결과로 입력값을 덮어쓰지 않다가, 사용자가 AI 후보를 직접 누를 때만 반영한다
     var applyAiOnce by remember { mutableStateOf(false) }
 
@@ -81,6 +84,7 @@ fun AddClothingScreen(
         detailType = item.detailType
         nameOverride = item.name
         seasonOverride = item.season
+        styleOverride = item.style
     }
     // 등록 모드에서 새 사진이거나, AI 후보를 바꾸면 분류를 AI 결과로 채운다
     LaunchedEffect(tagged?.originalUri, tagged?.selected) {
@@ -148,6 +152,7 @@ fun AddClothingScreen(
                 val colorName = color?.name ?: "베이지"
                 val autoName = AddClothingViewModel.suggestedName(colorName, category, subCategory, detailType)
                 val autoSeason = ClothingCategories.season(subCategory, detailType)
+                val autoStyle = StyleTagger.auto(nameOverride ?: autoName, category, subCategory, detailType, color?.value ?: 0xFFB5A38F)
 
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -325,13 +330,30 @@ fun AddClothingScreen(
                         }
                     }
 
+                    // 스타일 (옷 종류·색으로 자동, 수정 가능) — 코디 추천에 쓰인다
+                    Label("스타일")
+                    ChipRow {
+                        StylePreferenceStore.styles.forEach { style ->
+                            FilterChip(
+                                selected = (styleOverride ?: autoStyle) == style,
+                                // 자동으로 골라진 스타일을 다시 누르면 자동으로 되돌린다
+                                onClick = { styleOverride = if (style == autoStyle) null else style },
+                                label = { Text(style) },
+                                colors = chipColors()
+                            )
+                        }
+                    }
+                    if (styleOverride == null) {
+                        Text("옷 종류와 색을 보고 자동으로 골랐어요. 다른 스타일을 눌러 바꿀 수 있어요.", style = MaterialTheme.typography.bodySmall, color = MediumGray)
+                    }
+
                     // 저장 / 다시 선택(등록) · 취소(수정)
                     Button(
                         onClick = {
                             val name = nameOverride ?: autoName
                             val season = seasonOverride ?: autoSeason
-                            if (isEdit) viewModel.saveEdit(context, name, category, subCategory, detailType, season, imageMode)
-                            else viewModel.save(context, name, category, subCategory, detailType, season, imageMode)
+                            if (isEdit) viewModel.saveEdit(context, name, category, subCategory, detailType, season, styleOverride, imageMode)
+                            else viewModel.save(context, name, category, subCategory, detailType, season, styleOverride, imageMode)
                             onDone()
                         },
                         enabled = !s.garmentLoading,

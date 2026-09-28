@@ -27,8 +27,8 @@ object SampleWardrobe {
         sample("sample_08", "블랙 미니 스커트", "하의", "치마", "미니스커트", "사계절", "블랙", 0xFF282521, Kind.Photo),
         sample("sample_09", "베이지 블레이저", "아우터", "긴팔 아우터", "자켓", "봄·가을", "베이지", 0xFFCDB6A1, Kind.Photo),
         sample("sample_10", "데님 반팔 셔츠", "상의", "반팔 상의", "셔츠", "여름", "블루", 0xFF515A69, Kind.Garment("shop_denim_shirt")),
-        sample("sample_11", "스니커즈", "신발", "운동화", null, "사계절", "화이트", 0xFFDAD4D5, Kind.Photo),
-        sample("sample_12", "로퍼", "신발", "구두", null, "사계절", "블랙", 0xFF242728, Kind.BackgroundRemoved),
+        sample("sample_11", "스니커즈", "신발", "운동화", "스니커즈", "사계절", "화이트", 0xFFDAD4D5, Kind.Photo),
+        sample("sample_12", "로퍼", "신발", "구두", "로퍼", "사계절", "블랙", 0xFF242728, Kind.BackgroundRemoved),
     )
 
     /** 샘플 사진이 어떤 종류인지 — 옷 정보 수정에서 고를 수 있는 사진 버전이 달라진다. */
