@@ -56,7 +56,8 @@ object OutfitEngine {
         styleScores: Map<String, Int>,
         situation: Situation? = null,
         today: String = WearDates.today(),
-        count: Int = 4
+        count: Int = 4,
+        needOuter: Boolean = false   // 일교차가 큰 날처럼 낮 기온과 상관없이 겉옷을 더해야 할 때
     ): Result {
         val conditions = WeatherRules.Conditions(
             temp = weather?.temp,
@@ -91,7 +92,7 @@ object OutfitEngine {
         // ② 조합 만들기
         val bases: List<Pair<WardrobeItem, WardrobeItem?>> =
             tops.flatMap { t -> bottoms.map { b -> t to b } } + dresses.map { it to null }
-        val outerNeed = WeatherRules.outerNeed(conditions)
+        val outerNeed = if (needOuter && outers.isNotEmpty()) WeatherRules.OuterNeed.REQUIRED else WeatherRules.outerNeed(conditions)
         val outerOptions: List<WardrobeItem?> = when (outerNeed) {
             WeatherRules.OuterNeed.NONE -> listOf(null)
             WeatherRules.OuterNeed.OPTIONAL -> listOf(null) + outers

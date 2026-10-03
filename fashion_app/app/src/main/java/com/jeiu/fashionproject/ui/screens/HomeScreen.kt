@@ -40,14 +40,17 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.jeiu.fashionproject.data.StylePreferenceStore
 import com.jeiu.fashionproject.data.WardrobeStore
+import com.jeiu.fashionproject.data.WearDates
 import com.jeiu.fashionproject.data.WearLogStore
 import com.jeiu.fashionproject.data.advice
 import com.jeiu.fashionproject.data.isRainy
 import com.jeiu.fashionproject.data.isCloudy
+import com.jeiu.fashionproject.recommend.ForecastAlerts
 import com.jeiu.fashionproject.recommend.OutfitEngine
 import com.jeiu.fashionproject.ui.components.NotEnoughClothesCard
 import com.jeiu.fashionproject.ui.components.OutfitCard
 import com.jeiu.fashionproject.ui.theme.*
+import com.jeiu.fashionproject.ui.viewmodel.ForecastUiState
 import com.jeiu.fashionproject.ui.viewmodel.WeatherUiState
 import com.jeiu.fashionproject.ui.viewmodel.WeatherViewModel
 
@@ -65,6 +68,7 @@ private val popularItems = listOf(
 @Composable
 fun HomeScreen(
     onOutfitRecommendClick: () -> Unit,
+    onForecastClick: () -> Unit,
     onProductClick: () -> Unit,
     onAddClothing: () -> Unit,
     weatherViewModel: WeatherViewModel
@@ -105,6 +109,15 @@ fun HomeScreen(
     var ratings by remember { mutableStateOf(mapOf<String, Boolean>()) }
     var showNotifDialog by remember { mutableStateOf(false) }
 
+    // 내일 코디 (계획 4 — 3단계) — 예보에서 내일을 찾아 코디와 알림 문구를 만든다
+    val forecastState by weatherViewModel.forecast.collectAsState()
+    val forecastDays = (forecastState as? ForecastUiState.Success)?.days.orEmpty()
+    val tomorrowPlan = remember(wardrobe, wearLogs, forecastDays, weatherInfo) {
+        val index = forecastDays.indexOfFirst { it.date == WearDates.daysAgo(-1) }
+        if (index < 0) null
+        else ForecastAlerts.plan(forecastDays, index, weatherInfo?.temp, wardrobe, wearLogs, StylePreferenceStore.scores.value, count = 1)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -133,7 +146,10 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { showNotifDialog = true }) {
-                    Icon(Icons.Filled.Notifications, contentDescription = "알림", tint = CharcoalBlack)
+                    // 내일 날씨 알림이 있으면 빨간 점
+                    BadgedBox(badge = { if (tomorrowPlan?.alerts?.isNotEmpty() == true) Badge(containerColor = HeartPink) }) {
+                        Icon(Icons.Filled.Notifications, contentDescription = "알림", tint = CharcoalBlack)
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -253,6 +269,20 @@ fun HomeScreen(
             }
         }
 
+        // 내일 코디
+        tomorrowPlan?.let { plan ->
+            Spacer(modifier = Modifier.height(28.dp))
+            TomorrowOutfitSection(
+                plan = plan,
+                rated = ratings,
+                onRate = { outfit, like ->
+                    ratings = ratings + (outfit.id to like)
+                    StylePreferenceStore.rate(context, outfit.style, like)
+                },
+                onMore = onForecastClick
+            )
+        }
+
         Spacer(modifier = Modifier.height(28.dp))
 
         // 인기 상품
@@ -315,11 +345,62 @@ fun HomeScreen(
     if (showNotifDialog) {
         AlertDialog(
             onDismissRequest = { showNotifDialog = false },
-            title = { Text("알림", fontWeight = FontWeight.Bold) },
-            text = { Text("새로운 알림이 없습니다.") },
+            title = { Text(if (tomorrowPlan?.alerts?.isNotEmpty() == true) "내일 날씨 알림" else "알림", fontWeight = FontWeight.Bold) },
+            text = {
+                val alerts = tomorrowPlan?.alerts.orEmpty()
+                if (alerts.isEmpty()) Text("새로운 알림이 없습니다.")
+                else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    alerts.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { showNotifDialog = false }) { Text("확인", color = Camel) }
             }
         )
+    }
+}
+
+/** 홈 "내일 코디" — 내일 날씨 요약 + 알림 문구 + 코디 1벌 (계획 4 — 3단계) */
+@Composable
+private fun TomorrowOutfitSection(
+    plan: ForecastAlerts.DayPlan,
+    rated: Map<String, Boolean>,
+    onRate: (OutfitEngine.Outfit, Boolean) -> Unit,
+    onMore: () -> Unit
+) {
+    val day = plan.day
+    Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("내일 코디", style = MaterialTheme.typography.titleLarge, color = CharcoalBlack, fontWeight = FontWeight.Bold)
+                Text(
+                    "${WearDates.label(day.date)} · ${day.condition} · ${day.minTemp}~${day.maxTemp}°C",
+                    style = MaterialTheme.typography.bodySmall, color = MediumGray
+                )
+            }
+            TextButton(onClick = onMore) { Text("5일 예보", style = MaterialTheme.typography.bodySmall, color = Camel) }
+        }
+        val messages = plan.alerts.ifEmpty { listOf("내일은 오늘과 비슷한 날씨예요") }
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = CamelLight),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                messages.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = Brown) }
+            }
+        }
+        when (val r = plan.result) {
+            is OutfitEngine.Result.NotEnough -> Text(r.message, style = MaterialTheme.typography.bodySmall, color = MediumGray)
+            is OutfitEngine.Result.Ok -> r.outfits.firstOrNull()?.let { outfit ->
+                OutfitCard(
+                    outfit = outfit,
+                    rated = rated[outfit.id],
+                    onRate = { like -> onRate(outfit, like) },
+                    modifier = Modifier.fillMaxWidth(),
+                    photoHeight = 220.dp
+                )
+            }
+        }
     }
 }

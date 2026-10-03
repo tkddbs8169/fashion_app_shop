@@ -121,7 +121,8 @@ fun AppNavigation() {
             }
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onOutfitRecommendClick = { navController.navigate(Screen.OutfitRecommend.route) },
+                    onOutfitRecommendClick = { navController.navigate(Screen.OutfitRecommend.route()) },
+                    onForecastClick = { navController.navigate(Screen.OutfitRecommend.route(tab = 1)) },
                     onProductClick = { navController.navigate(Screen.ProductDetail.route) },
                     onAddClothing = { navController.navigate(Screen.AddClothing.route()) },
                     weatherViewModel = weatherViewModel
@@ -169,8 +170,12 @@ fun AppNavigation() {
             composable(Screen.VirtualFitting.route) {
                 VirtualFittingScreen(onBack = { navController.popBackStack() })
             }
-            composable(Screen.OutfitRecommend.route) {
+            composable(
+                Screen.OutfitRecommend.route,
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 })
+            ) { entry ->
                 OutfitRecommendScreen(
+                    initialTab = entry.arguments?.getInt("tab") ?: 0,
                     onBack = { navController.popBackStack() },
                     onAddClothing = { navController.navigate(Screen.AddClothing.route()) },
                     weatherViewModel = weatherViewModel

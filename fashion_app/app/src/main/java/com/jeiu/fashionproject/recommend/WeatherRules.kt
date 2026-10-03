@@ -117,9 +117,9 @@ object WeatherRules {
         return when {
             c.rainy && bottom != null && !isBright(bottom) -> "비 소식이 있어 어두운 하의를 골랐어요"
             t == null -> null
-            outer != null && t < 23 -> "오늘 ${t}도라 ${josa(outer.name, "을", "를")} 더했어요"
+            outer != null && t < 23 -> "${t}도 날씨라 ${josa(outer.name, "을", "를")} 더했어요"
             main.detailType == "니트" && t <= 11 -> "쌀쌀해서 따뜻한 니트를 골랐어요"
-            t >= 23 -> "오늘 ${t}도라 가볍게 입을 수 있게 골랐어요"
+            t >= 23 -> "${t}도 날씨라 가볍게 입을 수 있게 골랐어요"
             else -> null
         }
     }

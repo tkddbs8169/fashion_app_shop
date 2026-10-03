@@ -4,8 +4,10 @@ sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Home : Screen("home")
     object Wardrobe : Screen("wardrobe")
-    /** 코디 추천 (오늘 / 상황별) — 계획 4 */
-    object OutfitRecommend : Screen("outfit_recommend")
+    /** 코디 추천 (오늘 / 5일 예보 / 상황별) — 계획 4. tab을 주면 그 탭으로 열림 (0: 오늘, 1: 5일 예보, 2: 상황별) */
+    object OutfitRecommend : Screen("outfit_recommend?tab={tab}") {
+        fun route(tab: Int = 0) = "outfit_recommend?tab=$tab"
+    }
     object BodyAnalysis : Screen("body_analysis")
     object Shop : Screen("shop")
     object ProductDetail : Screen("product_detail")
